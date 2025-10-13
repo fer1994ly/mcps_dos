@@ -1,0 +1,37 @@
+[
+    {
+        "id": 1,
+        "name": "Alfonso",
+        "email": "alfonso@gmail.com",
+        "address": "Los gaciles 17",
+        "phone": "678345632"
+    },
+    {
+        "id": 2,
+        "name": "María",
+        "email": "maria@gmail.com",
+        "address": "Los portilas 54",
+        "phone": "698345633"
+    },
+    {
+        "id": 3,
+        "name": "Angel",
+        "email": "angel@gmail.com",
+        "address": "las  17",
+        "phone": "625345632"
+    },
+    {
+        "id": 4,
+        "name": "javier",
+        "email": "javier@gmail.com",
+        "address": "los madroños",
+        "phone": "98967"
+    },
+    {
+        "id": 5,
+        "name": "John Doe",
+        "email": "user@example.com",
+        "address": "123 Main St",
+        "phone": "123-456-7890"
+    }
+]
