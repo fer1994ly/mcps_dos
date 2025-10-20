@@ -8,6 +8,7 @@
       "dev": {
         "watch": "build/**/*.js",
         "debug": { "type": "node" }
+      
       }
     }
   },

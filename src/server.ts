@@ -1,11 +1,21 @@
 import { McpServer, ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { create } from "domain";
+
+// If MCP_SILENT=true, silence console.log and console.info so VS Code's
+// Add context -> MCP RESOURCES (which spawns the server over stdio) doesn't
+// show any non-protocol output in the terminal.
+if (process.env.MCP_SILENT === "true") {
+    console.log = (..._args: any[]) => { /* silent */ };
+    console.info = (..._args: any[]) => { /* silent */ };
+}
+
 import { json } from "stream/consumers";
 import z from "zod";
 import { readonly } from "zod/v4";
 import fs from "node:fs/promises";
 import { text } from "node:stream/consumers";
+import { CreateMessageResultSchema } from "@modelcontextprotocol/sdk/types.js";
 
 
 
@@ -18,6 +28,53 @@ const server = new McpServer({
         prompts:{}
     }
 })
+
+
+server.tool("create-random-user", "create a new user in the database",
+    {
+        title: "create-random-user",
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: true
+    },
+    async () => {
+        const res = await server.server.request(
+            {
+                method: "sampling/createMessage",
+                params: {
+                    messages: [{
+                        role: "user",
+                        content: {
+                            type: "text",
+                            text: "generate a fake user date. The user should have a realistic name, email, address and phone number. Return this data as JSON object with no other text formatted so it can be used with JSON.parse",
+
+                        }
+                    }
+                    ], maxTokens: 1024
+
+                },
+
+
+            },
+            CreateMessageResultSchema
+        )
+
+
+        if (res.content.type !== "text") {
+            return { content: [{ type: "text", text: "failed to generate user data" }] }
+        }
+        try {
+            const fakeUser = JSON.parse(res.content.text.trim().replace(/^```(?:json|JSON)\n?/, "").replace(/```$/, "").trim())
+            const id = await createUser(fakeUser)
+            return { content: [{ type: "text", text: `User ${id} created succesfully` }] }
+        }
+        catch {
+            return { content: [{ type: "text", text: "failed to generate user data" }] }
+
+        }
+    })
+   
 
 server.tool("create-user", "create new a new user in the database", {
     name: z.string(),
@@ -47,6 +104,8 @@ server.tool("create-user", "create new a new user in the database", {
         
     }
 )
+
+
 
 server.resource("users","users://all", {description:"get all users in the database",
     title: "users",
@@ -100,7 +159,6 @@ server.resource("user-details",new ResourceTemplate("users://{userId}/profile",{
                 }]
             }
     }
-
 )
 
 server.prompt("generate-user", "generate a fake user based on a given name", {
@@ -138,9 +196,9 @@ async function createUser(user: {
     await fs.writeFile("./src/data/users.json",JSON.stringify(users,null,2))
 
     return id
-
     
 }
+
 
 async function main() {
     const transport = new StdioServerTransport()

@@ -7,14 +7,17 @@
     "server:build:watch": "tsc --watch",
     "server:dev": "tsx src/server.ts",
     "server:inspect": "set DANGEROUSLY_OMIT_AUTH=true && npx @modelcontextprotocol/inspector npm run server:dev",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "client:dev":"tsx src/client.ts"
   },
   "author": "",
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "@inquirer/prompts": "^7.9.0",
     "@modelcontextprotocol/sdk": "^1.18.0",
     "@types/node": "24.0.3",
+    "dotenv": "^17.2.3",
     "tsx": "4.20.3",
     "typescript": "5.8.3",
     "zod": "^3.25.76"
