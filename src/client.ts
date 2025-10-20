@@ -3,6 +3,8 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { Client } from "@modelcontextprotocol/sdk/client";
 import { StdioClientTransport
  } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { Tool } from '@modelcontextprotocol/sdk/types.js';
+import { input } from '@inquirer/prompts';
 
 export const client = new Client({name:"test-client", version:"1.0.0"},{capabilities:{sampling:{}}});
 
@@ -32,9 +34,32 @@ console.log("you are connected")
                         ({ name: t.annotations, value: t.name, description: t.description })
                     )
                 });
-            
+          
+                const tool = tools.find(t => t.name === toolName);
+
+                if (tool === null){console.log("Tool not found")}
+                else {handleTool(tool)}
+                  break;
         }
+        
     }
+
+    
 }
+
+
+async function handleTool(tool: Tool) {
+    const args: Record<string, string | number> = {};
+    for (const [key, value] of Object.entries(tool.inputSchema.properties ?? {}))
+        args[key] = await input({
+            message: `Enter value for ${key} (${(value as { type: string }).type})
+} `})
+    const res = await client.callTool({ name: tool.name, arguments: args })
+    console.log(res.content)
+ 
+}
+
+
+
 
 main();
