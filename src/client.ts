@@ -2,16 +2,22 @@ import { ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { Client } from "@modelcontextprotocol/sdk/client";
 import { StdioClientTransport} from "@modelcontextprotocol/sdk/client/stdio.js";
-import { Tool } from '@modelcontextprotocol/sdk/types.js';
-import { input, select } from '@inquirer/prompts';
+import { Tool,Prompt, PromptMessage } from '@modelcontextprotocol/sdk/types.js';
+import { input, select, confirm } from '@inquirer/prompts';
+import {createGoogleGenerativeAI} from "@ai-sdk/google";
+import "dotenv/config"
 
 export const client = new Client({name:"test-client", version:"1.0.0"},{capabilities:{sampling:{}}});
 
 const transport = new StdioClientTransport({command:"node", args: ["build/server.js"],stderr:"ignore"});
+const google = createGoogleGenerativeAI({
+    apiKey: process.env.GOOGLE_API_KEY || "",
+});
+
 
 async function main() {
     await client.connect(transport);
-    const [{tools},{prompts},{resources},{resourceTemplates}] = await Promise.all([
+    const [{ tools }, { prompts }, { resources }, { resourceTemplates }] = await Promise.all([
         client.listTools(),
         client.listPrompts(),
         client.listResources(),
@@ -49,20 +55,20 @@ async function main() {
                     choices: [
                         ...resources.map(resource => ({
                             name: resource.name,
-                            value: resource.url,
+                            value: resource.uri,
                             description: resource.description,
                         })),
                         ...resourceTemplates.map(template => ({
                             name: template.name,
-                            value: template.url,
+                            value: template.uriTemplate,
                             description: template.description,
                         }))
                     ]
                 })
                 const url = resources.find(r => r.uri === resourceUrl)?.uri ??
-          resourceTemplates.find(r => r.uriTemplate === resourceUrl)
-            ?.uriTemplate
-                if(url == null) {
+                    resourceTemplates.find(r => r.uriTemplate === resourceUrl)
+                        ?.uriTemplate
+                if (url == null) {
                     console.log("Resource not found.")
                 }
                 else {
@@ -70,6 +76,23 @@ async function main() {
                     await handleResource(url as string)
                 }
                 
+                break;
+
+            case "Prompts":
+                const promptName = await select({
+                    message: "Select a prompt",
+                    choices: prompts.map(prompt => ({
+                        name: prompt.name,
+                        value: prompt.name,
+                        description: prompt.description,
+                    })),
+                })
+                const prompt = prompts.find(p => p.name === promptName)
+                if (prompt == null) {
+                    console.error("Prompt not found.")
+                } else {
+                    await handlePrompt(prompt)
+                }
                 break;
         }
     }
@@ -92,7 +115,6 @@ async function handleTool(tool: Tool) {
 
     console.log((res.content as [{ text: string }])[0].text)
 }
-
 async function handleResource(uri: string) {
     let finalUri = uri
     const paramMatches = uri.match(/{([^]+)}/g)
@@ -111,5 +133,58 @@ console.log(JSON.stringify(JSON.parse(res.contents[0].text as string), null, 2))
     
 }
 
+    
+
+async function handlePrompt(prompt: Prompt) {
+    const args: Record<string, string> = {}
+    for (const arg of prompt.arguments ??[] ){
+        args[arg.name] = await input({
+            message: `Enter value for ${arg.name}: `,
+        })
+        
+    } 
+    const response = await client.getPrompt({
+        name: prompt.name,
+        arguments: args,
+
+    })
+    for (const message of response.messages){
+        console.log(await handleServerMessagePrompt(message))
+    }
+
+}
+
+    async function handleServerMessagePrompt(message: PromptMessage) {
+        if (message.content.type !== "text") return
+        console.log(message.content.text)
+        
+        const run = await confirm({
+            message: "Would you like to run the above prompt?",
+            default: true,
+        
+        })
+    console.log(!run)
+        if (!run) return
+
+        try {
+            // Try to call the google provider if available. Different providers
+            // may return different shapes so be defensive here.
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const out = await (google as any)({
+                model: "gemini-2.5-flash",
+                prompt: message.content.text,
+            })
+
+            // Common output shapes: { text }, { output: { text } }, { outputs: [{ text }] }
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+            console.log(out)
+            const text = (out && ((out.text) || (out.output && out.output.text) || (Array.isArray(out.outputs) && out.outputs[0]?.text))) || message.content.text
+console.log(text)
+            return text
+        } catch (err) {
+            // Fallback to returning the original prompt text if generation fails
+            return message.content.text
+        }
+    }
 
 main();
