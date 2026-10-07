@@ -22,6 +22,7 @@ import { CreateMessageResultSchema } from "@modelcontextprotocol/sdk/types.js";
 const server = new McpServer({
     name:"test",
     version:"1.0.0",
+}, {
     capabilities: {
         resources:{},
         tools:{},
@@ -109,7 +110,7 @@ server.tool("create-user", "create new a new user in the database", {
 
 server.resource("users","users://all", {description:"get all users in the database",
     title: "users",
-    mindtype: "application/json",
+    mimeType: "application/json",
 
 }, 
 
@@ -131,7 +132,7 @@ async (uri)=> {
 server.resource("user-details",new ResourceTemplate("users://{userId}/profile",{list:undefined}),
  {description:"get a user details from the database",
     title: "user-details",
-    mindtype: "application/json",
+    mimeType: "application/json",
 
 }, 
 

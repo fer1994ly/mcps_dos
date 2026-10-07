@@ -1,10 +1,5 @@
-"use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
-Object.defineProperty(exports, "__esModule", { value: true });
-const mcp_js_1 = require("@modelcontextprotocol/sdk/server/mcp.js");
-const stdio_js_1 = require("@modelcontextprotocol/sdk/server/stdio.js");
+import { McpServer, ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 // If MCP_SILENT=true, silence console.log and console.info so VS Code's
 // Add context -> MCP RESOURCES (which spawns the server over stdio) doesn't
 // show any non-protocol output in the terminal.
@@ -12,12 +7,13 @@ if (process.env.MCP_SILENT === "true") {
     console.log = (..._args) => { };
     console.info = (..._args) => { };
 }
-const zod_1 = __importDefault(require("zod"));
-const promises_1 = __importDefault(require("node:fs/promises"));
-const types_js_1 = require("@modelcontextprotocol/sdk/types.js");
-const server = new mcp_js_1.McpServer({
+import z from "zod";
+import fs from "node:fs/promises";
+import { CreateMessageResultSchema } from "@modelcontextprotocol/sdk/types.js";
+const server = new McpServer({
     name: "test",
     version: "1.0.0",
+}, {
     capabilities: {
         resources: {},
         tools: {},
@@ -43,7 +39,7 @@ server.tool("create-random-user", "create a new user in the database", {
                 }
             ], maxTokens: 1024
         },
-    }, types_js_1.CreateMessageResultSchema);
+    }, CreateMessageResultSchema);
     if (res.content.type !== "text") {
         return { content: [{ type: "text", text: "failed to generate user data" }] };
     }
@@ -57,10 +53,10 @@ server.tool("create-random-user", "create a new user in the database", {
     }
 });
 server.tool("create-user", "create new a new user in the database", {
-    name: zod_1.default.string(),
-    email: zod_1.default.string(),
-    address: zod_1.default.string(),
-    phone: zod_1.default.string()
+    name: z.string(),
+    email: z.string(),
+    address: z.string(),
+    phone: z.string()
 }, {
     title: "create-user",
     readOnlyHint: false,
@@ -82,7 +78,7 @@ server.tool("create-user", "create new a new user in the database", {
 });
 server.resource("users", "users://all", { description: "get all users in the database",
     title: "users",
-    mindtype: "application/json",
+    mimeType: "application/json",
 }, async (uri) => {
     const users = await import("./data/users.json", { with: { type: "json" } }).then(m => m.default);
     return {
@@ -93,9 +89,9 @@ server.resource("users", "users://all", { description: "get all users in the dat
             }]
     };
 });
-server.resource("user-details", new mcp_js_1.ResourceTemplate("users://{userId}/profile", { list: undefined }), { description: "get a user details from the database",
+server.resource("user-details", new ResourceTemplate("users://{userId}/profile", { list: undefined }), { description: "get a user details from the database",
     title: "user-details",
-    mindtype: "application/json",
+    mimeType: "application/json",
 }, async (uri, { userId }) => {
     const users = await import("./data/users.json", { with: { type: "json" } }).then(m => m.default);
     const user = users.find((u) => u.id === parseInt(userId));
@@ -118,7 +114,7 @@ server.resource("user-details", new mcp_js_1.ResourceTemplate("users://{userId}/
     };
 });
 server.prompt("generate-user", "generate a fake user based on a given name", {
-    name: zod_1.default.string()
+    name: z.string()
 }, async ({ name }) => {
     return {
         messages: [
@@ -139,11 +135,11 @@ async function createUser(user) {
     users.push({
         id, ...user
     });
-    await promises_1.default.writeFile("./src/data/users.json", JSON.stringify(users, null, 2));
+    await fs.writeFile("./src/data/users.json", JSON.stringify(users, null, 2));
     return id;
 }
 async function main() {
-    const transport = new stdio_js_1.StdioServerTransport();
+    const transport = new StdioServerTransport();
     await server.connect(transport);
 }
 main();

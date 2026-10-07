@@ -1,6 +1,6 @@
 import { ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { Client } from "@modelcontextprotocol/sdk/client";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import {
   Tool,
@@ -16,8 +16,6 @@ export const client = new Client(
   { name: "test-client", version: "1.0.0" },
   { capabilities: { sampling: {} } },
 );
-
-console.log(process.env.GOOGLE_API_KEY);
 
 const transport = new StdioClientTransport({
   command: "node",
@@ -118,14 +116,14 @@ async function handleQuery(tools: Tool[]) {
     message: "Enter your query:",
   });
   const { text, toolResults } = await generateText({
-    model: "gemini-2.5-flash",
+    model: google("gemini-2.5-flash"),
     prompt: query,
     tools: tools.reduce(
       (objeto, tool) => ({
         ...objeto,
         [tool.name]: {
           description: tool.description,
-          parameters: jsonSchema(tool.inputSchema),
+          inputSchema: jsonSchema(tool.inputSchema),
           execute: async (args: Record<string, any>) => {
             return await client.callTool({
               name: tool.name,
@@ -137,10 +135,10 @@ async function handleQuery(tools: Tool[]) {
       {} as ToolSet,
     ),
   });
-  console.log(
-    // @ts-expect-error
-    text || toolResults[0]?.result?.content[0]?.text || "no text generated",
-  );
+  const output = toolResults[0]?.output as
+    | { content?: { type?: string; text?: string }[] }
+    | undefined;
+  console.log(text || output?.content?.find(part => part.type === "text")?.text || "no text generated");
 }
 
 async function handleTool(tool: Tool) {
@@ -173,9 +171,12 @@ async function handleResource(uri: string) {
     }
   }
   const res = await client.readResource({ uri: finalUri });
-  console.log(
-    JSON.stringify(JSON.parse(res.contents[0].text as string), null, 2),
-  );
+  const content = res.contents[0];
+  if (content && "text" in content) {
+    console.log(JSON.stringify(JSON.parse(content.text), null, 2));
+  } else {
+    console.log("Resource contains binary data.");
+  }
 }
 
 async function handlePrompt(prompt: Prompt) {
